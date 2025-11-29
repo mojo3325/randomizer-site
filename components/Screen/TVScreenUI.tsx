@@ -128,7 +128,10 @@ export const TVScreenUI = ({ wheelState }: TVScreenUIProps) => {
                     </form>
 
                     {/* List */}
-                    <div className="flex-1 overflow-y-auto border-2 border-retro-phosphor/30 bg-[#0a0a0a] p-1 custom-scrollbar">
+                    <div
+                        className="flex-1 overflow-y-auto border-2 border-retro-phosphor/30 bg-[#0a0a0a] p-1 custom-scrollbar"
+                        onWheel={(e) => e.stopPropagation()}
+                    >
                         {items.length === 0 && (
                             <div className="text-center text-[10px] opacity-50 mt-4 uppercase">No Data</div>
                         )}

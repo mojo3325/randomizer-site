@@ -1,11 +1,14 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { RoomScene } from "@/components/Scene/RoomScene";
 import { Loader } from "@react-three/drei";
+import { WelcomeScreen } from "@/components/ui/WelcomeScreen";
 
 export default function Home() {
+  const [started, setStarted] = useState(false);
+
   return (
     <main className="w-full h-screen bg-black relative">
       <Canvas
@@ -15,7 +18,7 @@ export default function Home() {
         gl={{ antialias: true }}
       >
         <Suspense fallback={null}>
-          <RoomScene />
+          <RoomScene started={started} />
         </Suspense>
       </Canvas>
       <Loader />
@@ -25,6 +28,8 @@ export default function Home() {
         <p>RETRO RANDOMIZER v1.0</p>
         <p>INTERACT WITH TV SCREEN</p>
       </div>
+
+      {!started && <WelcomeScreen onStart={() => setStarted(true)} />}
     </main>
   );
 }

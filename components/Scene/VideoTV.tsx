@@ -2,12 +2,19 @@ import React, { useRef } from "react";
 import { Html, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 
-export function VideoTV(props: any) {
+export function VideoTV({ active, ...props }: any) {
     const group = useRef<THREE.Group>(null);
     const occluderRef = useRef<THREE.Mesh>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
-    const [muted, setMuted] = React.useState(false);
-    const [volume, setVolume] = React.useState(40);
+    const [muted, setMuted] = React.useState(true);
+    const [volume, setVolume] = React.useState(20);
+
+    // Unmute when active becomes true
+    React.useEffect(() => {
+        if (active) {
+            setMuted(false);
+        }
+    }, [active]);
 
     // Handle Volume Changes via PostMessage
     React.useEffect(() => {
@@ -47,11 +54,6 @@ export function VideoTV(props: any) {
                     event: 'command',
                     func: 'playVideo',
                     args: []
-                }), '*');
-                iframeRef.current.contentWindow.postMessage(JSON.stringify({
-                    event: 'command',
-                    func: 'setVolume',
-                    args: [volume]
                 }), '*');
             }
         }, 2000); // Check every 2s
@@ -94,6 +96,7 @@ export function VideoTV(props: any) {
                 position={[0, 0, 1.17]}
                 scale={0.2}
                 occlude={[occluderRef]}
+                zIndexRange={[50, 0]}
                 style={{
                     width: "640px",
                     height: "480px",
@@ -104,49 +107,57 @@ export function VideoTV(props: any) {
                     boxSizing: "border-box",
                     backfaceVisibility: "hidden",
                     transformStyle: "preserve-3d",
-                    boxShadow: "0 0 25px rgba(0,0,0,0.4)"
+                    boxShadow: active ? "0 0 25px rgba(0,0,0,0.4)" : "none"
                 }}
             >
                 <div className="w-full h-full relative bg-black group">
                     <div className="absolute inset-0 pointer-events-none z-50 scanlines opacity-20" />
                     <div className="absolute inset-0 pointer-events-none z-40 bg-[radial-gradient(circle_at_center,transparent_50%,rgba(0,0,0,0.4)_100%)]" />
 
-                    <iframe
-                        ref={iframeRef}
-                        src={`https://www.youtube.com/embed/gT2wY0DjYGo?list=RDgT2wY0DjYGo&autoplay=1&controls=0&loop=1&enablejsapi=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3`}
-                        width="100%"
-                        height="100%"
-                        frameBorder="0"
-                        allow="autoplay *; encrypted-media; fullscreen; picture-in-picture"
-                        allowFullScreen
-                        className="w-full h-full object-cover pointer-events-none"
-                    />
+                    {active ? (
+                        <>
+                            <iframe
+                                ref={iframeRef}
+                                src={`https://www.youtube.com/embed/gT2wY0DjYGo?list=RDgT2wY0DjYGo&autoplay=1&controls=0&loop=1&enablejsapi=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3`}
+                                width="100%"
+                                height="100%"
+                                frameBorder="0"
+                                allow="autoplay *; encrypted-media; fullscreen; picture-in-picture"
+                                allowFullScreen
+                                className="w-full h-full object-cover pointer-events-none"
+                            />
 
-                    {/* Controls Overlay */}
-                    <div className="absolute bottom-6 right-6 z-50 flex flex-col items-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/60 p-3 rounded-xl backdrop-blur-md border border-white/10">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setMuted(!muted)}
-                                className="bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase min-w-[50px] transition-colors"
-                            >
-                                {muted ? "UNMUTE" : "MUTE"}
-                            </button>
-                            <div className="text-white text-[12px] font-mono font-bold w-[40px] text-right">{volume}%</div>
+                            {/* Controls Overlay */}
+                            <div className="absolute bottom-6 right-6 z-50 flex flex-col items-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/60 p-3 rounded-xl backdrop-blur-md border border-white/10">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setMuted(!muted)}
+                                        className="bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase min-w-[50px] transition-colors"
+                                    >
+                                        {muted ? "UNMUTE" : "MUTE"}
+                                    </button>
+                                    <div className="text-white text-[12px] font-mono font-bold w-[40px] text-right">{volume}%</div>
+                                </div>
+
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={volume}
+                                    onChange={(e) => {
+                                        const newVol = parseInt(e.target.value);
+                                        setVolume(newVol);
+                                        setMuted(false);
+                                    }}
+                                    className="w-32 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-500 hover:accent-red-400"
+                                />
+                            </div>
+                        </>
+                    ) : (
+                        <div className="w-full h-full bg-black flex items-center justify-center">
+                            <div className="w-2 h-2 bg-white/20 rounded-full animate-pulse" />
                         </div>
-
-                        <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={volume}
-                            onChange={(e) => {
-                                const newVol = parseInt(e.target.value);
-                                setVolume(newVol);
-                                setMuted(false);
-                            }}
-                            className="w-32 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-500 hover:accent-red-400"
-                        />
-                    </div>
+                    )}
                 </div>
             </Html>
 

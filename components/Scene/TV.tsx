@@ -3,7 +3,7 @@ import { Html, RoundedBox } from "@react-three/drei";
 import { TVScreenUI } from "@/components/Screen/TVScreenUI";
 import * as THREE from "three";
 
-export function TV(props: any) {
+export function TV({ active, wheelState, ...props }: any) {
     const group = useRef<THREE.Group>(null);
     const occluderRef = useRef<THREE.Mesh>(null);
 
@@ -43,6 +43,7 @@ export function TV(props: any) {
                 position={[0, 0, 1.17]}
                 scale={0.41}
                 occlude={[occluderRef]}
+                zIndexRange={[50, 0]}
                 style={{
                     width: "320px",
                     height: "240px",
@@ -53,10 +54,16 @@ export function TV(props: any) {
                     boxSizing: "border-box", // Ensure border is included in width/height
                     backfaceVisibility: "hidden",
                     transformStyle: "preserve-3d",
-                    boxShadow: "0 0 25px rgba(16,255,16,0.2)"
+                    boxShadow: active ? "0 0 25px rgba(16,255,16,0.2)" : "none"
                 }}
             >
-                <TVScreenUI wheelState={props.wheelState} />
+                {active ? (
+                    <TVScreenUI wheelState={wheelState} />
+                ) : (
+                    <div className="w-full h-full bg-black flex items-center justify-center">
+                        <div className="w-1 h-1 bg-white/50 rounded-full animate-pulse" />
+                    </div>
+                )}
             </Html>
 
             {/* Screen Glass Overlay (Subtle Curve) */}

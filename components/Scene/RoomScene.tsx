@@ -8,7 +8,7 @@ import { useWheel } from "@/components/Screen/useWheel";
 
 import { playSound } from "@/utils/sound";
 
-export function RoomScene() {
+export function RoomScene({ started }: { started: boolean }) {
     const wheelState = useWheel();
     const { winner, spinning } = wheelState;
 
@@ -44,17 +44,17 @@ export function RoomScene() {
             <pointLight position={[-5, 5, -5]} intensity={0.5} color="#ffaa00" />
 
             {/* Screen Glows */}
-            <pointLight position={[-3, 0, 2]} intensity={0.5} color="#aaffaa" distance={4} decay={2} />
-            <pointLight position={[3, 0, 2]} intensity={0.3} color="#aaaaff" distance={4} decay={2} />
+            <pointLight position={[-3, 0, 2]} intensity={started ? 0.5 : 0} color="#aaffaa" distance={4} decay={2} />
+            <pointLight position={[3, 0, 2]} intensity={started ? 0.3 : 0} color="#aaaaff" distance={4} decay={2} />
 
             {/* Environment for clear reflections */}
             <Environment preset="city" blur={0.5} background={false} />
 
             {/* The Main TV (Randomizer) */}
-            <TV position={[-2.5, 0, 0]} rotation={[0, 0.1, 0]} wheelState={wheelState} />
+            <TV position={[-2.5, 0, 0]} rotation={[0, 0.1, 0]} wheelState={wheelState} active={started} />
 
             {/* The Second TV (Video) */}
-            <VideoTV position={[2.5, 0, 0]} rotation={[0, -0.1, 0]} />
+            <VideoTV position={[2.5, 0, 0]} rotation={[0, -0.1, 0]} active={started} />
 
             {/* Peripherals */}
             <Keyboard position={[-2.5, -1.7, 3]} scale={0.2} rotation={[-0.1, 0.1, 0]} />
