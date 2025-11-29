@@ -68,6 +68,18 @@ export const TVScreenUI = ({ wheelState }: TVScreenUIProps) => {
     const { items, addItem, removeItem, clearItems, spin, spinning, rotation, winner } = wheelState;
     const [inputValue, setInputValue] = useState("");
 
+    const [showConfetti, setShowConfetti] = useState(false);
+
+    useEffect(() => {
+        if (winner) {
+            setShowConfetti(true);
+            const timer = setTimeout(() => setShowConfetti(false), 5000);
+            return () => clearTimeout(timer);
+        } else {
+            setShowConfetti(false);
+        }
+    }, [winner]);
+
     const handleAdd = (e?: React.FormEvent) => {
         e?.preventDefault();
         if (inputValue.trim()) {
@@ -78,11 +90,11 @@ export const TVScreenUI = ({ wheelState }: TVScreenUIProps) => {
 
     return (
         <div
-            style={{ width: "320px", height: "240px" }}
+            style={{ width: "100%", height: "100%" }}
             className="bg-[#111] text-retro-phosphor p-3 flex flex-col font-mono relative select-none overflow-hidden"
         >
             {/* Confetti inside the screen - Only shows when winner exists */}
-            {winner && !spinning && <ConfettiParticles />}
+            {winner && !spinning && showConfetti && <ConfettiParticles />}
 
             {/* CRT Overlay Effects */}
             <div className="absolute inset-0 pointer-events-none z-50 scanlines opacity-20" />

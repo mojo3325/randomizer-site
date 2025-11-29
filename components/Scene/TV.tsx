@@ -41,16 +41,16 @@ export function TV(props: any) {
             <Html
                 transform
                 position={[0, 0, 1.17]}
-                scale={1}
-                distanceFactor={1.4}
+                scale={0.41}
                 occlude={[occluderRef]}
                 style={{
-                    width: "256px",
-                    height: "192px",
-                    borderRadius: "28px",
+                    width: "320px",
+                    height: "240px",
+                    borderRadius: "18px",
                     background: "black",
                     overflow: "hidden",
-                    border: "6px solid #050505",
+                    border: "4px solid #050505",
+                    boxSizing: "border-box", // Ensure border is included in width/height
                     backfaceVisibility: "hidden",
                     transformStyle: "preserve-3d",
                     boxShadow: "0 0 25px rgba(16,255,16,0.2)"
