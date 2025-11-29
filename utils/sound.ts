@@ -1,7 +1,7 @@
 // Browser audio helper with pre-generated retro WAV samples
 let audioCtx: AudioContext | null = null;
-const buffers: Record<string, AudioBuffer> = {};
-const loading: Record<string, Promise<void>> = {};
+const buffers: Record<string, AudioBuffer | undefined> = {};
+const loading: Record<string, Promise<void> | undefined> = {};
 
 const SOUND_FILES = {
     keyboard: "/sounds/keyboard.wav",
