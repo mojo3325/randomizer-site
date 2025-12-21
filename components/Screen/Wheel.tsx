@@ -3,9 +3,10 @@ import React from "react";
 interface WheelProps {
     items: string[];
     rotation: number;
+    isLanding?: boolean; // true when doing final landing animation
 }
 
-export const Wheel: React.FC<WheelProps> = ({ items, rotation }) => {
+export const Wheel: React.FC<WheelProps> = ({ items, rotation, isLanding = false }) => {
     const numItems = items.length;
     const radius = 50; // SVG coordinate system
     const center = 50;
@@ -34,9 +35,10 @@ export const Wheel: React.FC<WheelProps> = ({ items, rotation }) => {
 
             {/* Wheel Container */}
             <div
-                className="w-full h-full rounded-full border-4 border-white/20 shadow-[0_0_15px_rgba(0,0,0,0.5)] overflow-hidden transition-transform duration-[4000ms] cubic-bezier(0.2, 0.8, 0.2, 1)"
+                className="w-full h-full rounded-full border-4 border-white/20 shadow-[0_0_15px_rgba(0,0,0,0.5)] overflow-hidden"
                 style={{
                     transform: `rotate(${rotation}deg)`,
+                    transition: isLanding ? "transform 4000ms cubic-bezier(0.2, 0.8, 0.2, 1)" : "none",
                 }}
             >
                 <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">

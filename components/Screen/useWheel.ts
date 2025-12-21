@@ -10,7 +10,9 @@ export function useWheel() {
     const [rotation, setRotation] = useState(0);
     const [winner, setWinner] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isLanding, setIsLanding] = useState(false);
     const eventSourceRef = useRef<EventSource | null>(null);
+    const spinIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Backwards compatibility
     const spinning = status === "spinning" || status === "waiting";
@@ -25,7 +27,6 @@ export function useWheel() {
                 console.error("Failed to parse stored items", e);
             }
         } else {
-            // Default items
             setItems(["Pizza", "Burger", "Sushi", "Tacos"]);
         }
     }, []);
@@ -37,11 +38,14 @@ export function useWheel() {
         }
     }, [items]);
 
-    // Cleanup SSE on unmount
+    // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (eventSourceRef.current) {
                 eventSourceRef.current.close();
+            }
+            if (spinIntervalRef.current) {
+                clearInterval(spinIntervalRef.current);
             }
         };
     }, []);
@@ -60,14 +64,31 @@ export function useWheel() {
         localStorage.removeItem(STORAGE_KEY);
     }, []);
 
-    // Spin to a specific winner index
-    const spinToIndex = useCallback((winnerIndex: number, currentItems: string[]) => {
+    // Start continuous spin animation
+    const startContinuousSpin = useCallback(() => {
+        if (spinIntervalRef.current) {
+            clearInterval(spinIntervalRef.current);
+        }
+        
+        spinIntervalRef.current = setInterval(() => {
+            setRotation(prev => prev + 30); // Rotate 30 degrees every 50ms
+        }, 50);
+    }, []);
+
+    // Stop continuous spin and land on specific index
+    const stopSpinOnIndex = useCallback((winnerIndex: number, currentItems: string[]) => {
+        if (spinIntervalRef.current) {
+            clearInterval(spinIntervalRef.current);
+            spinIntervalRef.current = null;
+        }
+
         setStatus("spinning");
+        setIsLanding(true);
 
         const singleSegment = 360 / currentItems.length;
         const winnerAngle = winnerIndex * singleSegment;
         const currentRot = rotation;
-        const minSpinAmount = 360 * 5;
+        const minSpinAmount = 360 * 3; // Less spins since already spinning
         const randomOffset = (Math.random() - 0.5) * (singleSegment * 0.8);
 
         const targetBase = -winnerAngle + randomOffset;
@@ -78,14 +99,27 @@ export function useWheel() {
 
         setRotation(target);
 
-        // Wait for animation to finish
         setTimeout(() => {
             setStatus("idle");
+            setIsLanding(false);
             setWinner(currentItems[winnerIndex]);
         }, 4000);
     }, [rotation]);
 
-    // Main spin function - now uses Telegram integration
+    // Get random winner index
+    const getRandomWinnerIndex = useCallback((itemCount: number): number => {
+        const randomValues = new Uint32Array(1);
+        crypto.getRandomValues(randomValues);
+        return randomValues[0] % itemCount;
+    }, []);
+
+    // Fallback to random selection
+    const fallbackToRandom = useCallback((currentItems: string[]) => {
+        const winnerIndex = getRandomWinnerIndex(currentItems.length);
+        stopSpinOnIndex(winnerIndex, currentItems);
+    }, [getRandomWinnerIndex, stopSpinOnIndex]);
+
+    // Main spin function
     const spin = useCallback(async () => {
         if (items.length < 2 || status !== "idle") return;
 
@@ -93,7 +127,20 @@ export function useWheel() {
         setWinner(null);
         setError(null);
 
+        // Start spinning immediately
+        startContinuousSpin();
+
         try {
+            // Check subscriber count first
+            const subResponse = await fetch("/api/telegram/subscribe");
+            const { count } = await subResponse.json();
+
+            if (count === 0) {
+                // No subscribers - use random immediately
+                fallbackToRandom(items);
+                return;
+            }
+
             // Create spin session and send to Telegram
             const response = await fetch("/api/spin", {
                 method: "POST",
@@ -102,16 +149,11 @@ export function useWheel() {
             });
 
             if (!response.ok) {
-                throw new Error("Failed to create spin session");
-            }
-
-            const { sessionId, sentTo } = await response.json();
-
-            if (sentTo === 0) {
-                setError("Нет подписчиков в Telegram боте!");
-                setStatus("idle");
+                fallbackToRandom(items);
                 return;
             }
+
+            const { sessionId } = await response.json();
 
             // Connect to SSE to wait for choice
             const eventSource = new EventSource(`/api/spin/${sessionId}/stream`);
@@ -121,45 +163,43 @@ export function useWheel() {
                 const data = JSON.parse(event.data);
                 eventSource.close();
                 eventSourceRef.current = null;
-
-                // Spin to the chosen index
-                spinToIndex(data.chosenIndex, items);
+                stopSpinOnIndex(data.chosenIndex, items);
             });
 
             eventSource.addEventListener("timeout", () => {
                 eventSource.close();
                 eventSourceRef.current = null;
-                setError("Время ожидания истекло");
-                setStatus("idle");
+                // Timeout - fallback to random
+                fallbackToRandom(items);
             });
 
             eventSource.addEventListener("expired", () => {
                 eventSource.close();
                 eventSourceRef.current = null;
-                setError("Сессия истекла");
-                setStatus("idle");
+                fallbackToRandom(items);
             });
 
-            eventSource.addEventListener("error", (event) => {
-                console.error("SSE error:", event);
+            eventSource.addEventListener("error", () => {
                 eventSource.close();
                 eventSourceRef.current = null;
-                setError("Ошибка соединения");
-                setStatus("idle");
+                fallbackToRandom(items);
             });
 
-        } catch (err) {
-            console.error("Spin error:", err);
-            setError("Ошибка при запуске");
-            setStatus("idle");
+        } catch {
+            // Any error - fallback to random
+            fallbackToRandom(items);
         }
-    }, [items, status, spinToIndex]);
+    }, [items, status, startContinuousSpin, fallbackToRandom, stopSpinOnIndex]);
 
-    // Cancel waiting
+    // Cancel (for internal use)
     const cancelSpin = useCallback(() => {
         if (eventSourceRef.current) {
             eventSourceRef.current.close();
             eventSourceRef.current = null;
+        }
+        if (spinIntervalRef.current) {
+            clearInterval(spinIntervalRef.current);
+            spinIntervalRef.current = null;
         }
         setStatus("idle");
         setError(null);
@@ -172,10 +212,11 @@ export function useWheel() {
         clearItems,
         spin,
         cancelSpin,
-        spinning, // backwards compat
+        spinning,
         status,
         rotation,
         winner,
         error,
+        isLanding,
     };
 }
