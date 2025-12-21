@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { TV } from "./TV";
 import { VideoTV } from "./VideoTV";
 import { Keyboard } from "./Keyboard";
@@ -6,28 +6,8 @@ import { Mouse } from "./Mouse";
 import { ContactShadows, Environment, OrbitControls } from "@react-three/drei";
 import { useWheel } from "@/components/Screen/useWheel";
 
-import { playSound } from "@/utils/sound";
-
 export function RoomScene({ started }: { started: boolean }) {
     const wheelState = useWheel();
-    const { winner, spinning } = wheelState;
-
-    // Sound Effects
-    useEffect(() => {
-        if (winner) {
-            playSound("win");
-        }
-    }, [winner]);
-
-    useEffect(() => {
-        if (spinning) {
-            // Loop spin sound
-            const interval = setInterval(() => {
-                playSound("spin");
-            }, 50); // Ratchet sound every 50ms
-            return () => clearInterval(interval);
-        }
-    }, [spinning]);
 
     return (
         <>

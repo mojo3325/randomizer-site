@@ -1,28 +1,46 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { playSound } from "@/utils/sound";
 
 const STORAGE_KEY = "randomizer-items";
-const TELEGRAM_TIMEOUT_MS = 5000; // 5 seconds to wait for Telegram choice
+const TELEGRAM_TIMEOUT_MS = 5000;
 
-export type WheelStatus = "idle" | "waiting" | "spinning";
-
-// Check if we're in development mode
 const isDevelopment = typeof window !== "undefined" && 
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+export type WheelStatus = "idle" | "spinning" | "landing";
 
 export function useWheel() {
     const [items, setItems] = useState<string[]>([]);
     const [status, setStatus] = useState<WheelStatus>("idle");
     const [rotation, setRotation] = useState(0);
     const [winner, setWinner] = useState<string | null>(null);
-    const [isLanding, setIsLanding] = useState(false);
+    
     const eventSourceRef = useRef<EventSource | null>(null);
-    const spinIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const animationRef = useRef<number | null>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastTimeRef = useRef<number>(0);
+    const lastTickSegmentRef = useRef<number>(-1);
+    const currentRotationRef = useRef<number>(0);
+    const itemsRef = useRef<string[]>([]);
+    
+    // Animation state
+    const velocityRef = useRef<number>(0);
+    const targetRotationRef = useRef<number | null>(null);
+    const isDeceleratingRef = useRef<boolean>(false);
+    const winnerIndexRef = useRef<number | null>(null);
 
-    // Backwards compatibility
-    const spinning = status === "spinning" || status === "waiting";
+    useEffect(() => {
+        currentRotationRef.current = rotation;
+    }, [rotation]);
 
-    // Load from local storage on mount
+    useEffect(() => {
+        itemsRef.current = items;
+    }, [items]);
+
+    const spinning = status === "spinning" || status === "landing";
+    const isLanding = status === "landing";
+
+    // Load from local storage
     useEffect(() => {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
@@ -36,26 +54,29 @@ export function useWheel() {
         }
     }, []);
 
-    // Save to local storage whenever items change
     useEffect(() => {
         if (items.length > 0) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
         }
     }, [items]);
 
-    // Cleanup on unmount
     useEffect(() => {
-        return () => {
-            if (eventSourceRef.current) {
-                eventSourceRef.current.close();
-            }
-            if (spinIntervalRef.current) {
-                clearInterval(spinIntervalRef.current);
-            }
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-            }
-        };
+        return () => { cleanup(); };
+    }, []);
+
+    const cleanup = useCallback(() => {
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+        }
+        if (animationRef.current) {
+            cancelAnimationFrame(animationRef.current);
+            animationRef.current = null;
+        }
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+        }
     }, []);
 
     const addItem = useCallback((item: string) => {
@@ -72,86 +93,145 @@ export function useWheel() {
         localStorage.removeItem(STORAGE_KEY);
     }, []);
 
-    // Get random winner index using crypto
     const getRandomWinnerIndex = useCallback((itemCount: number): number => {
         const randomValues = new Uint32Array(1);
         crypto.getRandomValues(randomValues);
         return randomValues[0] % itemCount;
     }, []);
 
-    // Start continuous spinning animation
-    const startContinuousSpin = useCallback(() => {
-        if (spinIntervalRef.current) {
-            clearInterval(spinIntervalRef.current);
+    const checkTick = useCallback((rot: number, itemCount: number) => {
+        if (itemCount === 0) return;
+        const segmentSize = 360 / itemCount;
+        const currentSegment = Math.floor(((rot % 360) + 360) % 360 / segmentSize);
+        
+        if (currentSegment !== lastTickSegmentRef.current) {
+            lastTickSegmentRef.current = currentSegment;
+            playSound("spin");
         }
-        spinIntervalRef.current = setInterval(() => {
-            setRotation(prev => prev + 25);
-        }, 50);
     }, []);
 
-    // Stop spinning and land on specific winner
-    const landOnWinner = useCallback((winnerIndex: number, currentItems: string[]) => {
-        // Stop continuous spin
-        if (spinIntervalRef.current) {
-            clearInterval(spinIntervalRef.current);
-            spinIntervalRef.current = null;
-        }
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-        }
-        if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
+    // Main animation loop
+    const animate = useCallback((timestamp: number) => {
+        if (lastTimeRef.current === 0) {
+            lastTimeRef.current = timestamp;
         }
 
+        const deltaTime = Math.min(timestamp - lastTimeRef.current, 50); // Cap at 50ms
+        lastTimeRef.current = timestamp;
+        const dt = deltaTime / 1000;
+
+        let newRotation = currentRotationRef.current;
+        let continueAnimation = true;
+
+        if (isDeceleratingRef.current && targetRotationRef.current !== null) {
+            // Decelerating towards target
+            const target = targetRotationRef.current;
+            const distance = target - currentRotationRef.current;
+            
+            if (distance <= 1) {
+                // Close enough, snap to target
+                newRotation = target;
+                continueAnimation = false;
+                
+                // Animation complete
+                setStatus("idle");
+                if (winnerIndexRef.current !== null) {
+                    setWinner(itemsRef.current[winnerIndexRef.current]);
+                    playSound("win");
+                }
+                isDeceleratingRef.current = false;
+                targetRotationRef.current = null;
+                winnerIndexRef.current = null;
+            } else {
+                // Smooth deceleration using lerp
+                // Speed decreases as we approach target
+                const progress = 1 - (distance / (distance + velocityRef.current * dt * 60));
+                const minSpeed = 30; // Minimum degrees per second
+                const speed = Math.max(minSpeed, velocityRef.current * (1 - progress * 0.03));
+                velocityRef.current = speed;
+                
+                newRotation = currentRotationRef.current + speed * dt;
+                
+                // Don't overshoot
+                if (newRotation >= target) {
+                    newRotation = target;
+                }
+            }
+        } else {
+            // Constant speed spinning
+            newRotation = currentRotationRef.current + velocityRef.current * dt;
+        }
+
+        setRotation(newRotation);
+        checkTick(newRotation, itemsRef.current.length);
+
+        if (continueAnimation) {
+            animationRef.current = requestAnimationFrame(animate);
+        }
+    }, [checkTick]);
+
+    const startSpinning = useCallback(() => {
         setStatus("spinning");
-        setIsLanding(true);
+        lastTimeRef.current = 0;
+        lastTickSegmentRef.current = -1;
+        velocityRef.current = 720; // Start at 720 deg/sec (2 rotations/sec)
+        isDeceleratingRef.current = false;
+        targetRotationRef.current = null;
+        animationRef.current = requestAnimationFrame(animate);
+    }, [animate]);
 
-        // Calculate final rotation to land on winner
-        const singleSegment = 360 / currentItems.length;
-        const winnerAngle = winnerIndex * singleSegment;
-        const currentRot = rotation;
-        const minSpinAmount = 360 * 4;
-        const randomOffset = (Math.random() - 0.5) * (singleSegment * 0.7);
-
-        const targetBase = -winnerAngle + randomOffset;
-        let target = targetBase;
-        while (target < currentRot + minSpinAmount) {
+    const calculateLandingRotation = useCallback((winnerIndex: number, itemCount: number, currentRot: number): number => {
+        const segmentSize = 360 / itemCount;
+        const segmentCenter = winnerIndex * segmentSize + segmentSize / 2;
+        
+        // To bring segment N to top: rotate by negative of its center angle
+        const targetAngle = -segmentCenter;
+        
+        // Need at least 3 more full rotations worth of distance
+        const minDistance = 360 * 3;
+        
+        let target = targetAngle;
+        while (target <= currentRot + minDistance) {
             target += 360;
         }
+        
+        // Small random offset for natural feel
+        const maxOffset = segmentSize * 0.3;
+        const randomOffset = (Math.random() - 0.5) * 2 * maxOffset;
+        target += randomOffset;
+        
+        return target;
+    }, []);
 
-        setRotation(target);
+    const landOnWinner = useCallback((winnerIndex: number) => {
+        const currentItems = itemsRef.current;
+        const currentRot = currentRotationRef.current;
+        
+        const target = calculateLandingRotation(winnerIndex, currentItems.length, currentRot);
+        
+        setStatus("landing");
+        isDeceleratingRef.current = true;
+        targetRotationRef.current = target;
+        winnerIndexRef.current = winnerIndex;
+        // Keep current velocity for smooth transition
+    }, [calculateLandingRotation]);
 
-        // Complete animation after 4 seconds
-        setTimeout(() => {
-            setStatus("idle");
-            setIsLanding(false);
-            setWinner(currentItems[winnerIndex]);
-        }, 4000);
-    }, [rotation]);
-
-    // Main spin function
     const spin = useCallback(async () => {
         if (items.length < 2 || status !== "idle") return;
 
-        setStatus("waiting");
+        cleanup();
         setWinner(null);
+        startSpinning();
 
-        // Start continuous spinning animation immediately
-        startContinuousSpin();
-
-        // DEVELOPMENT MODE: Always use random immediately
         if (isDevelopment) {
             console.log("[DEV] Using local random");
             setTimeout(() => {
-                const winnerIndex = getRandomWinnerIndex(items.length);
-                landOnWinner(winnerIndex, items);
-            }, 1500); // Small delay for visual effect
+                const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
+                landOnWinner(winnerIndex);
+            }, 2000);
             return;
         }
 
-        // PRODUCTION MODE: Wait for Telegram choice
         try {
             const response = await fetch("/api/spin", {
                 method: "POST",
@@ -160,35 +240,35 @@ export function useWheel() {
             });
 
             if (!response.ok) {
-                // API error - fallback to random
                 const winnerIndex = getRandomWinnerIndex(items.length);
-                landOnWinner(winnerIndex, items);
+                landOnWinner(winnerIndex);
                 return;
             }
 
-            const { sessionId, subscriberCount } = await response.json();
+            const { sessionId, sentTo } = await response.json();
 
-            if (subscriberCount === 0) {
-                // No subscribers - use random immediately
+            if (sentTo === 0) {
                 console.log("[PROD] No subscribers, using random");
-                const winnerIndex = getRandomWinnerIndex(items.length);
-                landOnWinner(winnerIndex, items);
+                setTimeout(() => {
+                    const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
+                    landOnWinner(winnerIndex);
+                }, 2000);
                 return;
             }
 
-            // Has subscribers - wait for their choice via SSE
             console.log("[PROD] Waiting for Telegram choice...");
             
             const eventSource = new EventSource(`/api/spin/${sessionId}/stream`);
             eventSourceRef.current = eventSource;
 
-            // Set timeout - if no choice in 5 seconds, fallback to random
             timeoutRef.current = setTimeout(() => {
                 console.log("[PROD] Timeout - falling back to random");
-                eventSource.close();
-                eventSourceRef.current = null;
-                const winnerIndex = getRandomWinnerIndex(items.length);
-                landOnWinner(winnerIndex, items);
+                if (eventSourceRef.current) {
+                    eventSourceRef.current.close();
+                    eventSourceRef.current = null;
+                }
+                const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
+                landOnWinner(winnerIndex);
             }, TELEGRAM_TIMEOUT_MS);
 
             eventSource.addEventListener("chosen", (event) => {
@@ -200,7 +280,7 @@ export function useWheel() {
                 const data = JSON.parse(event.data);
                 eventSource.close();
                 eventSourceRef.current = null;
-                landOnWinner(data.chosenIndex, items);
+                landOnWinner(data.chosenIndex);
             });
 
             eventSource.addEventListener("timeout", () => {
@@ -211,28 +291,28 @@ export function useWheel() {
                 }
                 eventSource.close();
                 eventSourceRef.current = null;
-                const winnerIndex = getRandomWinnerIndex(items.length);
-                landOnWinner(winnerIndex, items);
+                const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
+                landOnWinner(winnerIndex);
             });
 
             eventSource.onerror = () => {
-                console.log("[PROD] SSE error - falling back to random");
+                console.log("[PROD] SSE error");
                 if (timeoutRef.current) {
                     clearTimeout(timeoutRef.current);
                     timeoutRef.current = null;
                 }
                 eventSource.close();
                 eventSourceRef.current = null;
-                const winnerIndex = getRandomWinnerIndex(items.length);
-                landOnWinner(winnerIndex, items);
+                const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
+                landOnWinner(winnerIndex);
             };
 
         } catch (e) {
             console.error("[PROD] API error:", e);
             const winnerIndex = getRandomWinnerIndex(items.length);
-            landOnWinner(winnerIndex, items);
+            landOnWinner(winnerIndex);
         }
-    }, [items, status, startContinuousSpin, getRandomWinnerIndex, landOnWinner]);
+    }, [items, status, cleanup, startSpinning, getRandomWinnerIndex, landOnWinner]);
 
     return {
         items,
