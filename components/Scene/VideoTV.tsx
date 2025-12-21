@@ -6,15 +6,8 @@ export function VideoTV({ active, ...props }: any) {
     const group = useRef<THREE.Group>(null);
     const occluderRef = useRef<THREE.Mesh>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
-    const [muted, setMuted] = React.useState(true);
+    const [muted, setMuted] = React.useState(true); // Always start muted
     const [volume, setVolume] = React.useState(10);
-
-    // Unmute when active becomes true
-    React.useEffect(() => {
-        if (active) {
-            setMuted(false);
-        }
-    }, [active]);
 
     // Handle Volume Changes via PostMessage
     React.useEffect(() => {
@@ -118,7 +111,7 @@ export function VideoTV({ active, ...props }: any) {
                         <>
                             <iframe
                                 ref={iframeRef}
-                                src={`https://www.youtube.com/embed/gT2wY0DjYGo?list=RDgT2wY0DjYGo&autoplay=1&controls=0&loop=1&enablejsapi=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3`}
+                                src={`https://www.youtube.com/embed/gT2wY0DjYGo?list=RDgT2wY0DjYGo&autoplay=1&mute=1&controls=0&loop=1&enablejsapi=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3`}
                                 width="100%"
                                 height="100%"
                                 frameBorder="0"
