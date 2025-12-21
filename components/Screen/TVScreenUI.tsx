@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { Wheel } from "./Wheel";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Trash2, Plus, RefreshCcw } from "lucide-react";
+import { Trash2, Plus, RefreshCcw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { WheelStatus } from "./useWheel";
 
 interface TVScreenUIProps {
     wheelState: {
@@ -12,15 +13,18 @@ interface TVScreenUIProps {
         removeItem: (index: number) => void;
         clearItems: () => void;
         spin: () => void;
+        cancelSpin: () => void;
         spinning: boolean;
+        status: WheelStatus;
         rotation: number;
         winner: string | null;
+        error: string | null;
     };
 }
 
 // Simple CSS Confetti
 const ConfettiParticles = () => {
-    const [particles, setParticles] = useState<any[]>([]);
+    const [particles, setParticles] = useState<{ id: number; color: string; delay: number; duration: number; left: string }[]>([]);
 
     useEffect(() => {
         const colors = ["#f00", "#0f0", "#00f", "#ff0", "#0ff", "#f0f"];
@@ -64,8 +68,33 @@ const ConfettiParticles = () => {
     );
 };
 
+// Waiting overlay
+const WaitingOverlay = ({ onCancel }: { onCancel: () => void }) => {
+    return (
+        <div className="absolute inset-0 bg-black/80 z-40 flex flex-col items-center justify-center">
+            <div className="text-retro-phosphor text-center">
+                <div className="text-lg font-bold mb-2 animate-pulse">ОЖИДАНИЕ TELEGRAM</div>
+                <div className="text-xs opacity-70 mb-4">Кто-то должен выбрать в боте...</div>
+                <div className="flex gap-1 justify-center mb-4">
+                    <div className="w-2 h-2 bg-retro-phosphor rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <div className="w-2 h-2 bg-retro-phosphor rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <div className="w-2 h-2 bg-retro-phosphor rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+                <Button
+                    onClick={onCancel}
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-[10px] border-red-500 text-red-400 hover:bg-red-900/50 hover:text-red-200 rounded-none"
+                >
+                    <X className="w-3 h-3 mr-1" /> ОТМЕНА
+                </Button>
+            </div>
+        </div>
+    );
+};
+
 export const TVScreenUI = ({ wheelState }: TVScreenUIProps) => {
-    const { items, addItem, removeItem, clearItems, spin, spinning, rotation, winner } = wheelState;
+    const { items, addItem, removeItem, clearItems, spin, cancelSpin, spinning, status, rotation, winner, error } = wheelState;
     const [inputValue, setInputValue] = useState("");
 
     const [showConfetti, setShowConfetti] = useState(false);
@@ -88,11 +117,17 @@ export const TVScreenUI = ({ wheelState }: TVScreenUIProps) => {
         }
     };
 
+    const isWaiting = status === "waiting";
+    const isSpinning = status === "spinning";
+
     return (
         <div
             style={{ width: "100%", height: "100%" }}
             className="bg-[#111] text-retro-phosphor p-3 flex flex-col font-mono relative select-none overflow-hidden"
         >
+            {/* Waiting Overlay */}
+            {isWaiting && <WaitingOverlay onCancel={cancelSpin} />}
+
             {/* Confetti inside the screen - Only shows when winner exists */}
             {winner && !spinning && showConfetti && <ConfettiParticles />}
 
@@ -105,8 +140,11 @@ export const TVScreenUI = ({ wheelState }: TVScreenUIProps) => {
             <header className="flex justify-between items-center border-b-2 border-retro-phosphor/50 pb-1 mb-2 z-10">
                 <h1 className="text-sm font-bold tracking-widest crt-text uppercase text-shadow-glow">RANDOMIZER</h1>
                 <div className="text-[10px] opacity-80 flex items-center gap-1">
-                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                    REC
+                    <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        isWaiting ? "bg-yellow-500 animate-pulse" : "bg-red-500 animate-pulse"
+                    )} />
+                    {isWaiting ? "WAIT" : "REC"}
                 </div>
             </header>
 
@@ -175,17 +213,22 @@ export const TVScreenUI = ({ wheelState }: TVScreenUIProps) => {
                                 spinning ? "opacity-50 cursor-not-allowed border-0 translate-y-1" : "bg-retro-phosphor text-black hover:bg-[#44ff44] shadow-[0_0_10px_rgba(51,255,51,0.3)]"
                             )}
                         >
-                            {spinning ? "..." : "SPIN"}
+                            {isSpinning ? "..." : isWaiting ? "WAIT" : "SPIN"}
                         </Button>
 
-                        {/* Winner Display */}
+                        {/* Status Display */}
                         <div className="h-8 flex items-center justify-center w-full">
                             {winner && !spinning && (
                                 <div className="animate-bounce text-sm font-bold text-yellow-300 crt-text text-center bg-black/80 px-2 py-1 border border-yellow-300 shadow-[0_0_10px_rgba(255,255,0,0.5)] uppercase">
                                     ★ {winner} ★
                                 </div>
                             )}
-                            {items.length < 2 && !spinning && (
+                            {error && !spinning && (
+                                <div className="text-[8px] text-red-500 text-center uppercase font-bold animate-pulse">
+                                    {error}
+                                </div>
+                            )}
+                            {items.length < 2 && !spinning && !error && (
                                 <div className="text-[8px] text-red-500 text-center uppercase font-bold animate-pulse">Insert Tape</div>
                             )}
                         </div>
