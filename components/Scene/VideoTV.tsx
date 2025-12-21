@@ -7,7 +7,7 @@ export function VideoTV({ active, ...props }: any) {
     const occluderRef = useRef<THREE.Mesh>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [muted, setMuted] = React.useState(true);
-    const [volume, setVolume] = React.useState(20);
+    const [volume, setVolume] = React.useState(10);
 
     // Unmute when active becomes true
     React.useEffect(() => {

@@ -32,29 +32,27 @@ export function TV({ active, wheelState, ...props }: any) {
             </mesh>
 
             {/* Invisible occluder (prevents back-side visibility) */}
-            <mesh ref={occluderRef} position={[0, 0, -0.2]}>
-                <boxGeometry args={[5.6, 4.5, 3]} />
+            <mesh ref={occluderRef} position={[0, 0, -1.5]}>
+                <boxGeometry args={[5.6, 4.5, 2]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
 
-            {/* Interactive UI Layer - LARGER SCREEN */}
+            {/* Interactive UI Layer - Fitted to bezel */}
             <Html
                 transform
-                position={[0, 0.05, 1.28]}
-                scale={0.52}
+                position={[0, 0, 1.35]}
+                scale={0.46}
                 occlude={[occluderRef]}
-                zIndexRange={[50, 0]}
+                zIndexRange={[100, 0]}
                 style={{
                     width: "400px",
-                    height: "300px",
-                    borderRadius: "20px",
+                    height: "290px",
+                    borderRadius: "12px",
                     background: "black",
                     overflow: "hidden",
-                    border: "5px solid #050505",
                     boxSizing: "border-box",
                     backfaceVisibility: "hidden",
-                    transformStyle: "preserve-3d",
-                    boxShadow: active ? "0 0 40px rgba(16,255,16,0.3), inset 0 0 30px rgba(16,255,16,0.1)" : "none"
+                    boxShadow: active ? "0 0 25px rgba(16,255,16,0.25)" : "none"
                 }}
             >
                 {active ? (
