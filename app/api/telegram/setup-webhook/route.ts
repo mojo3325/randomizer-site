@@ -20,7 +20,9 @@ export async function GET() {
         );
     }
 
-    const webhookUrl = `${appUrl}/api/telegram/webhook`;
+    // Remove trailing slash from appUrl if present
+    const baseUrl = appUrl.endsWith('/') ? appUrl.slice(0, -1) : appUrl;
+    const webhookUrl = `${baseUrl}/api/telegram/webhook`;
 
     try {
         // Set webhook
