@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { playSound } from "@/utils/sound";
 
 const STORAGE_KEY = "randomizer-items";
-const TELEGRAM_TIMEOUT_MS = 30000; // 30 seconds to wait for Telegram choice
+const TELEGRAM_TIMEOUT_MS = 5000; // 5 seconds - if no choice, pick random
 
 const isDevelopment = typeof window !== "undefined" && 
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
