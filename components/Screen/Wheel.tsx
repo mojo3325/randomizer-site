@@ -29,7 +29,7 @@ export const Wheel: React.FC<WheelProps> = ({ items, rotation, isLanding = false
     };
 
     return (
-        <div className="relative w-36 h-36 mx-auto my-2">
+        <div className="relative w-44 h-44 mx-auto">
             {/* Pointer */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-20 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[20px] border-t-white drop-shadow-md" />
 

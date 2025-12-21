@@ -5,6 +5,7 @@ import {
     editMessageText,
     sendMessage,
     addSubscriber,
+    removeSubscriber,
 } from "@/lib/telegram";
 
 interface TelegramUpdate {
@@ -36,7 +37,18 @@ export async function POST(request: NextRequest) {
             await addSubscriber(chatId);
             await sendMessage({
                 chatId,
-                text: "✅ <b>Подписка активирована!</b>\n\nТеперь ты будешь получать уведомления о новых голосованиях рулетки.",
+                text: "✅ <b>Подписка активирована!</b>\n\nТеперь ты будешь получать уведомления о новых голосованиях рулетки.\n\nДля отписки отправь /stop",
+            });
+            return NextResponse.json({ ok: true });
+        }
+
+        // Handle /stop command - unsubscribe user
+        if (update.message?.text === "/stop") {
+            const chatId = update.message.chat.id;
+            await removeSubscriber(chatId);
+            await sendMessage({
+                chatId,
+                text: "🔕 <b>Подписка отменена.</b>\n\nТы больше не будешь получать уведомления.\n\nЧтобы подписаться снова, отправь /start",
             });
             return NextResponse.json({ ok: true });
         }
