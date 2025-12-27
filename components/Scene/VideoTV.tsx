@@ -33,8 +33,8 @@ export function VideoTV({ active, ...props }: any) {
                         args: []
                     }), '*');
                 }
-            } catch (e) {
-                console.error("Failed to send volume command", e);
+            } catch {
+                // ignore postMessage errors
             }
         }
     }, [volume, muted]);

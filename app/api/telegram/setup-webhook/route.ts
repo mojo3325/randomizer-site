@@ -52,8 +52,7 @@ export async function GET() {
                 { status: 500 }
             );
         }
-    } catch (error) {
-        console.error("Setup webhook error:", error);
+    } catch {
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }

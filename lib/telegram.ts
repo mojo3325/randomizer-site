@@ -157,8 +157,8 @@ export async function broadcastSpinOptions(
                 replyMarkup: keyboard,
             });
             if (success) sent++;
-        } catch (error) {
-            console.error(`Failed to send to ${chatId}:`, error);
+        } catch {
+            // ignore send errors
         }
     }
 

@@ -24,8 +24,7 @@ export async function POST(request: NextRequest) {
             sessionId: session.id,
             sentTo: sentCount,
         });
-    } catch (error) {
-        console.error("Spin API error:", error);
+    } catch {
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }

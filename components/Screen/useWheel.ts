@@ -46,8 +46,8 @@ export function useWheel() {
         if (stored) {
             try {
                 setItems(JSON.parse(stored));
-            } catch (e) {
-                console.error("Failed to parse stored items", e);
+            } catch {
+                // ignore parse errors
             }
         } else {
             setItems(["Pizza", "Burger", "Sushi", "Tacos"]);
@@ -224,7 +224,6 @@ export function useWheel() {
         startSpinning();
 
         if (isDevelopment) {
-            console.log("[DEV] Using local random");
             setTimeout(() => {
                 const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
                 landOnWinner(winnerIndex);
@@ -248,7 +247,6 @@ export function useWheel() {
             const { sessionId, sentTo } = await response.json();
 
             if (sentTo === 0) {
-                console.log("[PROD] No subscribers, using random");
                 setTimeout(() => {
                     const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
                     landOnWinner(winnerIndex);
@@ -256,13 +254,10 @@ export function useWheel() {
                 return;
             }
 
-            console.log("[PROD] Waiting for Telegram choice...");
-            
             const eventSource = new EventSource(`/api/spin/${sessionId}/stream`);
             eventSourceRef.current = eventSource;
 
             timeoutRef.current = setTimeout(() => {
-                console.log("[PROD] Timeout - falling back to random");
                 if (eventSourceRef.current) {
                     eventSourceRef.current.close();
                     eventSourceRef.current = null;
@@ -272,7 +267,6 @@ export function useWheel() {
             }, TELEGRAM_TIMEOUT_MS);
 
             eventSource.addEventListener("chosen", (event) => {
-                console.log("[PROD] Received choice from Telegram");
                 if (timeoutRef.current) {
                     clearTimeout(timeoutRef.current);
                     timeoutRef.current = null;
@@ -284,7 +278,6 @@ export function useWheel() {
             });
 
             eventSource.addEventListener("timeout", () => {
-                console.log("[PROD] Server timeout");
                 if (timeoutRef.current) {
                     clearTimeout(timeoutRef.current);
                     timeoutRef.current = null;
@@ -296,7 +289,6 @@ export function useWheel() {
             });
 
             eventSource.onerror = () => {
-                console.log("[PROD] SSE error");
                 if (timeoutRef.current) {
                     clearTimeout(timeoutRef.current);
                     timeoutRef.current = null;
@@ -307,8 +299,7 @@ export function useWheel() {
                 landOnWinner(winnerIndex);
             };
 
-        } catch (e) {
-            console.error("[PROD] API error:", e);
+        } catch {
             const winnerIndex = getRandomWinnerIndex(items.length);
             landOnWinner(winnerIndex);
         }

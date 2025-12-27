@@ -79,8 +79,7 @@ export async function GET(
 
                     elapsed += pollInterval;
                     setTimeout(poll, pollInterval);
-                } catch (error) {
-                    console.error("SSE poll error:", error);
+                } catch {
                     sendEvent("error", { message: "Server error" });
                     controller.close();
                 }

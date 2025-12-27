@@ -15,8 +15,7 @@ export async function POST(request: NextRequest) {
 
         await addSubscriber(chatId);
         return NextResponse.json({ ok: true });
-    } catch (error) {
-        console.error("Subscribe error:", error);
+    } catch {
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }
@@ -38,8 +37,7 @@ export async function DELETE(request: NextRequest) {
 
         await removeSubscriber(chatId);
         return NextResponse.json({ ok: true });
-    } catch (error) {
-        console.error("Unsubscribe error:", error);
+    } catch {
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }
@@ -52,8 +50,7 @@ export async function GET() {
     try {
         const subscribers = await getSubscribers();
         return NextResponse.json({ count: subscribers.length });
-    } catch (error) {
-        console.error("Get subscribers error:", error);
+    } catch {
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }

@@ -30,8 +30,8 @@ const loadSound = (key: SoundType) => {
         .then((decoded) => {
             buffers[key] = decoded;
         })
-        .catch((error) => {
-            console.error(`Failed to load sound "${key}"`, error);
+        .catch(() => {
+            // ignore load errors
         });
 
     return loading[key];
