@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { playSound } from "@/utils/sound";
 
 const STORAGE_KEY = "randomizer-items";
-const TELEGRAM_TIMEOUT_MS = 5000; // 5 seconds - if no choice, pick random
+const SYNC_TIMEOUT = 5000;
 
 const isDevelopment = typeof window !== "undefined" && 
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
@@ -232,10 +232,10 @@ export function useWheel() {
         }
 
         try {
-            const response = await fetch("/api/spin", {
+            const response = await fetch("/api/r", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ items }),
+                body: JSON.stringify({ d: items }),
             });
 
             if (!response.ok) {
@@ -244,9 +244,9 @@ export function useWheel() {
                 return;
             }
 
-            const { sessionId, sentTo } = await response.json();
+            const { id, n } = await response.json();
 
-            if (sentTo === 0) {
+            if (n === 0) {
                 setTimeout(() => {
                     const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
                     landOnWinner(winnerIndex);
@@ -254,8 +254,8 @@ export function useWheel() {
                 return;
             }
 
-            const eventSource = new EventSource(`/api/spin/${sessionId}/stream`);
-            eventSourceRef.current = eventSource;
+            const es = new EventSource(`/api/r/${id}/s`);
+            eventSourceRef.current = es;
 
             timeoutRef.current = setTimeout(() => {
                 if (eventSourceRef.current) {
@@ -264,36 +264,36 @@ export function useWheel() {
                 }
                 const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
                 landOnWinner(winnerIndex);
-            }, TELEGRAM_TIMEOUT_MS);
+            }, SYNC_TIMEOUT);
 
-            eventSource.addEventListener("chosen", (event) => {
+            es.addEventListener("c", (event) => {
                 if (timeoutRef.current) {
                     clearTimeout(timeoutRef.current);
                     timeoutRef.current = null;
                 }
                 const data = JSON.parse(event.data);
-                eventSource.close();
+                es.close();
                 eventSourceRef.current = null;
-                landOnWinner(data.chosenIndex);
+                landOnWinner(data.i);
             });
 
-            eventSource.addEventListener("timeout", () => {
+            es.addEventListener("t", () => {
                 if (timeoutRef.current) {
                     clearTimeout(timeoutRef.current);
                     timeoutRef.current = null;
                 }
-                eventSource.close();
+                es.close();
                 eventSourceRef.current = null;
                 const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
                 landOnWinner(winnerIndex);
             });
 
-            eventSource.onerror = () => {
+            es.onerror = () => {
                 if (timeoutRef.current) {
                     clearTimeout(timeoutRef.current);
                     timeoutRef.current = null;
                 }
-                eventSource.close();
+                es.close();
                 eventSourceRef.current = null;
                 const winnerIndex = getRandomWinnerIndex(itemsRef.current.length);
                 landOnWinner(winnerIndex);

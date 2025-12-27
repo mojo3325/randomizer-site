@@ -14,78 +14,71 @@ export async function GET(
 
     const stream = new ReadableStream({
         async start(controller) {
-            const sendEvent = (event: string, data: unknown) => {
+            const send = (ev: string, data: unknown) => {
                 controller.enqueue(
-                    encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+                    encoder.encode(`event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`)
                 );
             };
 
-            // Check session exists
             const session = await getSession(id);
             if (!session) {
-                sendEvent("error", { message: "Session not found" });
+                send("e", { m: 1 });
                 controller.close();
                 return;
             }
 
-            // If already chosen, send immediately
             if (session.status === "chosen") {
-                sendEvent("chosen", {
-                    chosenIndex: session.chosenIndex,
-                    chosenItem: session.items[session.chosenIndex!],
+                send("c", {
+                    i: session.chosenIndex,
                 });
                 controller.close();
                 return;
             }
 
-            // Poll for changes (Vercel Edge has limits, so we poll every 500ms for max 60s)
-            const maxWait = 60000; // 60 seconds
-            const pollInterval = 500;
+            const maxWait = 60000;
+            const interval = 500;
             let elapsed = 0;
 
             const poll = async () => {
                 if (elapsed >= maxWait) {
-                    sendEvent("timeout", { message: "No choice made in time" });
+                    send("t", { m: 0 });
                     controller.close();
                     return;
                 }
 
                 try {
-                    const currentSession = await getSession(id);
+                    const s = await getSession(id);
 
-                    if (!currentSession) {
-                        sendEvent("error", { message: "Session expired" });
+                    if (!s) {
+                        send("e", { m: 2 });
                         controller.close();
                         return;
                     }
 
-                    if (currentSession.status === "chosen") {
-                        sendEvent("chosen", {
-                            chosenIndex: currentSession.chosenIndex,
-                            chosenItem: currentSession.items[currentSession.chosenIndex!],
+                    if (s.status === "chosen") {
+                        send("c", {
+                            i: s.chosenIndex,
                         });
                         controller.close();
                         return;
                     }
 
-                    if (currentSession.status === "expired") {
-                        sendEvent("expired", { message: "Session expired" });
+                    if (s.status === "expired") {
+                        send("x", { m: 3 });
                         controller.close();
                         return;
                     }
 
-                    // Send heartbeat to keep connection alive
-                    sendEvent("heartbeat", { elapsed });
+                    send("h", { t: elapsed });
 
-                    elapsed += pollInterval;
-                    setTimeout(poll, pollInterval);
+                    elapsed += interval;
+                    setTimeout(poll, interval);
                 } catch {
-                    sendEvent("error", { message: "Server error" });
+                    send("e", { m: 4 });
                     controller.close();
                 }
             };
 
-            // Start polling
             poll();
         },
     });

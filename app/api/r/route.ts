@@ -5,28 +5,25 @@ import { broadcastSpinOptions } from "@/lib/telegram";
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { items } = body;
+        const { d } = body;
 
-        if (!Array.isArray(items) || items.length < 2) {
+        if (!Array.isArray(d) || d.length < 2) {
             return NextResponse.json(
-                { error: "At least 2 items required" },
+                { e: 1 },
                 { status: 400 }
             );
         }
 
-        // Create session in Redis
-        const session = await createSession(items);
-
-        // Send to Telegram subscribers
-        const sentCount = await broadcastSpinOptions(session.id, items);
+        const session = await createSession(d);
+        const cnt = await broadcastSpinOptions(session.id, d);
 
         return NextResponse.json({
-            sessionId: session.id,
-            sentTo: sentCount,
+            id: session.id,
+            n: cnt,
         });
     } catch {
         return NextResponse.json(
-            { error: "Internal server error" },
+            { e: 2 },
             { status: 500 }
         );
     }
